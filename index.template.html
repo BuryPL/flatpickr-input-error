@@ -54,5 +54,24 @@
 
     })
   </script>
+  <!-- <script>
+    var fp = flatpickr(".date", {
+      altInput: true,
+      allowInput: true,
+      dateFormat: "d/m/Y H:i",
+      altFormat: "d/m/Y H:i"
+    })
+    let oldOne = fp.setDate;
+    fp.setDate = function (
+    date,
+    triggerChange = false,
+    format = self.config.dateFormat
+  ) {
+    let re = new RegExp('^\d{2}\/\d{2}\/\d{4} \d{2}\:\d{2}$', 'g')
+    if(!date || re)
+      oldOne(date, triggerChange, format);
+    
+  }
+  </script> -->
 </body>
 </html>
