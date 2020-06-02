@@ -20,6 +20,7 @@
     label > div {
       margin-bottom: 4px;
     }
+    .notFilledBg { background-color: lightpink !important; }
   </style>
 </head>
 <body>
@@ -52,7 +53,10 @@
 
   <script>
     var fp = flatpickr(".date", {
-      plugins: [new inputValidationPlugin()]
+      plugins: [new inputValidationPlugin({
+        dateFormat: "d/m/Y",
+        placeholder: "dd/MM/yyyy"
+      })]
     })
   </script>
   <!-- <script>
