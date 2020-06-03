@@ -22,20 +22,25 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
     const config = { ...inputValidationConfig, ...pluginConfig };
     let separator: string;
     let constructedRe: string;
+
     return (parent: Instance) => {
+      let invalidValueAttribute: string = "data-invalid-value";
+
       parent.config.dateFormat = config.dateFormat;
 
       function whenValid() {
         parent._input.setAttribute(config.isValidAttrName, 'false');
+        parent._input.removeAttribute(invalidValueAttribute);
         parent._input.classList.remove(config.invalidClassName);
       }
 
-      function whenInvalid() {
+      function whenInvalid(value: string) {
         parent._input.setAttribute(config.isValidAttrName, 'false');
+        parent._input.setAttribute(invalidValueAttribute, value);
         parent._input.classList.add(config.invalidClassName);
       }
 
-      function handleDuration(date: string) {
+      function durationOnValid(date: string) {
         const inputs = [
           parent.hourElement as HTMLInputElement,
           parent.minuteElement as HTMLInputElement,
@@ -50,29 +55,31 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
             return;
           if (inputs[i])
             inputs[i].value = val;
-        })
+        });
+        if(parent.selectedDates.length !== 0)
+          parent.timeContainer?.dispatchEvent(new Event('increment'));
       }
 
       function overrideSetDate() {
-        let oldSetDate = parent.setDate;
+        let baseSetDate = parent.setDate;
         parent.setDate = function setDate(date: string | number | Date | import("../../types/options").DateOption[],
           triggerChange = false,
           format = config.dateFormat) {
             if (!date) {
-              oldSetDate(date, triggerChange, format);
+              baseSetDate(date, triggerChange, format);
               return;
             }
             let re = new RegExp(constructedRe);
             let isValid = re.test(date.toString());
             if(isValid){
               whenValid();
-              if (parent.loadedPlugins.indexOf("duration") === -1)
-                oldSetDate(date, triggerChange, format);
+              if (parent.loadedPlugins.indexOf("duration") === -1 || parent.selectedDates.length === 0)
+                baseSetDate(date, triggerChange, format);
               else
-                handleDuration(date.toString());
+                durationOnValid(date.toString());
             }
-            else{
-              whenInvalid();
+            else {
+              whenInvalid(date.toString());
             }
         }
       }
@@ -99,13 +106,32 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           .join("");
       }
 
+      function valueChanged(parsedDate: Date[], dateString: string) {
+        if (parent.loadedPlugins.indexOf("duration") === -1) 
+          return;
+          console.log('dateStr', parsedDate);
+          let arr = dateString.split(separator);
+        if (arr.length < 1)
+          return;
+        let val = parent._input.getAttribute(invalidValueAttribute);
+        if(val && 
+          arr[0] === parent.config.defaultHour.toString() &&
+          arr[1] === parent.config.defaultMinute.toString()) {
+          parent.input.value = val;
+        } else {
+          whenValid();
+        }
+          
+      }
+
       return {
           onParseConfig() {
             parent.config.mode = "single";
             parent.config.allowInput = true;
           },
+          onValueUpdate: valueChanged,
           onReady: [
-            setup,
+              setup,
               overrideSetDate,
               constructRegEx,
               () => {
