@@ -5,6 +5,7 @@ import { Plugin } from "../../types/options";
 export interface InpuitValidationConfig {
   dateFormat: string;
   placeholder: string;
+  instantValidate: boolean;
   invalidClassName: string;
   isValidAttrName: string
 }
@@ -12,13 +13,14 @@ export interface InpuitValidationConfig {
 const inputValidationConfig: InpuitValidationConfig = {
   dateFormat: "d/m/Y H:i",
   placeholder: "",
-  invalidClassName: "notFilledBg",
+  instantValidate: true,
+  invalidClassName: "format-invalid",
   isValidAttrName: "data-is-valid"
 };
 
 function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin {
     const config = { ...inputValidationConfig, ...pluginConfig };
-
+    let separator: string;
     let constructedRe: string;
     return (parent: Instance) => {
       parent.config.dateFormat = config.dateFormat;
@@ -31,6 +33,24 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       function whenInvalid() {
         parent._input.setAttribute(config.isValidAttrName, 'false');
         parent._input.classList.add(config.invalidClassName);
+      }
+
+      function handleDuration(date: string) {
+        const inputs = [
+          parent.hourElement as HTMLInputElement,
+          parent.minuteElement as HTMLInputElement,
+          parent.secondElement as HTMLInputElement
+        ]
+        
+        let arr = date.split(separator);
+        if (arr.length < 1)
+          return;
+        arr.forEach((val, i: number) => {
+          if (isNaN(parseInt(val)) || i > 2)
+            return;
+          if (inputs[i])
+            inputs[i].value = val;
+        })
       }
 
       function overrideSetDate() {
@@ -46,7 +66,10 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
             let isValid = re.test(date.toString());
             if(isValid){
               whenValid();
-              oldSetDate(date, triggerChange, format);
+              if (parent.loadedPlugins.indexOf("duration") === -1)
+                oldSetDate(date, triggerChange, format);
+              else
+                handleDuration(date.toString());
             }
             else{
               whenInvalid();
@@ -55,18 +78,24 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       }
 
       function setup() {
-        parent.element.setAttribute("placeholder", config.placeholder ? config.placeholder : config.dateFormat);
+        parent.input.placeholder = config.placeholder ? config.placeholder : config.dateFormat;
       }
 
       function constructRegEx() {
         constructedRe = parent.config.dateFormat
           .split("")
-          .map((c, i, arr) =>
-            tokenRegex[c as token] && arr[i - 1] !== "\\"
-              ? tokenRegex[c as token]
-              : c !== "\\"
-              ? "\\" + c
-              : "")
+          .map((c, i, arr) => {
+            if(c == "I") //temp workaround for duration plugin
+              return "(\\d\\d)";
+            else if( tokenRegex[c as token] && arr[i - 1] !== "\\")
+              return tokenRegex[c as token];
+            else if (c !== "\\") {
+              separator = c;
+              return "\\" + c
+            }
+            else 
+              return "";
+          })
           .join("");
       }
 
