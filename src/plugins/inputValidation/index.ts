@@ -7,7 +7,7 @@ export interface InpuitValidationConfig {
   placeholder: string;
   instantValidate: boolean;
   invalidClassName: string;
-  isValidAttrName: string
+  isValidAttrName: string;
 }
 
 const inputValidationConfig: InpuitValidationConfig = {
@@ -31,13 +31,15 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       function whenValid() {
         parent._input.setAttribute(config.isValidAttrName, 'false');
         parent._input.removeAttribute(invalidValueAttribute);
-        parent._input.classList.remove(config.invalidClassName);
+        if (config.instantValidate)
+          parent._input.classList.remove(config.invalidClassName);
       }
 
       function whenInvalid(value: string) {
         parent._input.setAttribute(config.isValidAttrName, 'false');
         parent._input.setAttribute(invalidValueAttribute, value);
-        parent._input.classList.add(config.invalidClassName);
+        if (config.instantValidate)
+          parent._input.classList.add(config.invalidClassName);
       }
 
       function durationOnValid(date: string) {
