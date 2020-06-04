@@ -42,6 +42,9 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           parent._input.classList.add(config.invalidClassName);
       }
 
+      /*
+        *assigns input time to proper input if duration plugin is used
+        */
       function durationOnValid(date: string) {
         const inputs = [
           parent.hourElement as HTMLInputElement,
@@ -108,6 +111,9 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           .join("");
       }
 
+        /*
+        *used just for duration plugin; this fixes a problem of input value being reassigned to default when wrong format is used
+        */
       function valueChanged(parsedDate: Date[], dateString: string) {
         if (parent.loadedPlugins.indexOf("duration") === -1) 
           return;

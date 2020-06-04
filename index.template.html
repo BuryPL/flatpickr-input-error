@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="dist/ie.css">
   <link rel="stylesheet" href="dist/plugins/confirmDate/confirmDate.css">
   <link rel="stylesheet" href="dist/plugins/monthSelect/style.css">
+  <link rel="stylesheet" href="dist/plugins/inputValidation/style.css">
   
   <style type="text/css">
     body {
@@ -20,7 +21,6 @@
     label > div {
       margin-bottom: 4px;
     }
-    .notFilledBg { background-color: lightpink !important; }
   </style>
 </head>
 <body>
@@ -47,36 +47,24 @@
   <script src="./dist/plugins/confirmDate/confirmDate.js"></script>
   <script src="./dist/plugins/minMaxTimePlugin.js"></script>
   <script src="./dist/plugins/monthSelect/index.js"></script>
+  <script src="./dist/plugins/duration/index.js"></script>
   <script src="./dist/plugins/inputValidation/index.js"></script>
   <script src="./dist/plugins/scrollPlugin.js"></script>
   <script src="./dist/plugins/weekSelect/weekSelect.js"></script>
 
   <script>
     var fp = flatpickr(".date", {
-      plugins: [new inputValidationPlugin({
-        dateFormat: "d/m/Y",
-        placeholder: "dd/MM/yyyy"
-      })]
+      time_24hr: true,
+      plugins: [
+      new inputValidationPlugin({
+        dateFormat: "H:I",
+        placeholder: "hh:mm"
+      }),
+      new durationPlugin({
+        timeFormat: "H:I"
+      })
+    ]
     })
   </script>
-  <!-- <script>
-    var fp = flatpickr(".date", {
-      altInput: true,
-      allowInput: true,
-      dateFormat: "d/m/Y H:i",
-      altFormat: "d/m/Y H:i"
-    })
-    let oldOne = fp.setDate;
-    fp.setDate = function (
-    date,
-    triggerChange = false,
-    format = self.config.dateFormat
-  ) {
-    let re = new RegExp('^\d{2}\/\d{2}\/\d{4} \d{2}\:\d{2}$', 'g')
-    if(!date || re)
-      oldOne(date, triggerChange, format);
-    
-  }
-  </script> -->
 </body>
 </html>
