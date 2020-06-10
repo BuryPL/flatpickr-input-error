@@ -166,6 +166,11 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           .join("");
       }
 
+      function handleDefaultDate() {
+        if (parent.config.defaultDate)
+          parent.input.dispatchEvent(new Event('blur'));
+      }
+
       function updateValue(newVal: string) {
         if (standinInput.value !== newVal)
           standinInput.value = newVal;
@@ -215,13 +220,14 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           },
           onValueUpdate: valueChanged,
           onReady: [
-              adjustConfig,
-              constructRegEx,
-              createAdditionalInput,
-              appendEventListeners,
-              () => {
-                  parent.loadedPlugins.push("inputValidation");
-              },
+            adjustConfig,
+            constructRegEx,
+            createAdditionalInput,
+            appendEventListeners,
+            handleDefaultDate,
+            () => {
+                parent.loadedPlugins.push("inputValidation");
+            }
           ],
           onDestroy: onDestroy
         };
