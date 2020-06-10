@@ -22,7 +22,6 @@ const inputValidationConfig: InpuitValidationConfig = {
 
 function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin {
     const config = { ...inputValidationConfig, ...pluginConfig };
-    let originalClassListFiltered = "";
     let constructedRe: string;
     let separator: string;
     let standinInput: HTMLInputElement;
@@ -46,14 +45,19 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       }
 
       function createAdditionalInput() {
-        //copy all classes but the flatpickr-input
-        originalClassListFiltered = parent.element.classList.toString().replace('flatpickr-input', '').trim();
-        //remove all classes but the flatpickr one for styling pourposes
-        parent.element.classList.remove(originalClassListFiltered);
         let standinInputLocal = parent._createElement<HTMLInputElement>(
           "input",
-          "flatpickr-input-validation-mock-input " + originalClassListFiltered
+          "flatpickr-input-validation-mock-input"
         );
+
+        parent.element.classList.forEach((val) => { 
+          if(val !== 'flatpickr-input')
+            standinInputLocal.classList.add(val); 
+        });
+
+        standinInputLocal.classList.forEach((val) => {
+          parent.element.classList.remove(val);
+        });
 
         standinInputLocal.tabIndex = -1;
 
@@ -165,7 +169,8 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
             updateValue(dateString);
             whenValid();
           }
-          console.log('dateStr', parsedDate);
+          if(false)
+            console.log('dateStr', parsedDate);
           let arr = dateString.split(separator);
           if (arr.length < 1)
             return;
@@ -182,10 +187,13 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       }
       
       function onDestroy() {
-        if(standinInput)
-          standinInput.removeEventListener("click", localOnClick)
-        if(originalClassListFiltered)
-          parent.element.classList.add(originalClassListFiltered);
+        if(standinInput) {
+          standinInput.removeEventListener("click", localOnClick);
+          standinInput.classList.forEach((val) => {
+            if(val !== 'flatpickr-input-validation-mock-input')
+              parent.element.classList.add(val);
+          });
+        }
       }
 
       return {
