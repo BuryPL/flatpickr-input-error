@@ -179,6 +179,12 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
         }
       }
       
+      function onDestroy() {
+        if(standinInput) {
+          standinInput.removeEventListener("click", localOnClick)
+        }
+      }
+
       return {
           onParseConfig() {
             parent.config.mode = "single";
@@ -194,7 +200,8 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
               () => {
                   parent.loadedPlugins.push("inputValidation");
               },
-          ]
+          ],
+          onDestroy: onDestroy
         };
     };
 }  
