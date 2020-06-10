@@ -8,6 +8,7 @@ export interface InpuitValidationConfig {
   instantValidate: boolean;
   invalidClassName: string;
   isValidAttrName: string;
+  classesToLeaveOnOriginal: string[];
   attributesToCopy: string[];
 }
 
@@ -17,19 +18,28 @@ const inputValidationConfig: InpuitValidationConfig = {
   instantValidate: true,
   invalidClassName: "format-invalid",
   isValidAttrName: "data-is-valid",
+  classesToLeaveOnOriginal: ['flatpickr-input'],
   attributesToCopy: ['style', 'readonly', 'disabled']
 };
 
 function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin {
-    const config = { ...inputValidationConfig, ...pluginConfig };
+    const config = inputValidationConfig;
     let constructedRe: string;
     let separator: string;
     let standinInput: HTMLInputElement;
 
     return (parent: Instance) => {
       function adjustConfig() {
+        config.dateFormat = pluginConfig?.dateFormat ? pluginConfig?.dateFormat : config.dateFormat;
+        config.placeholder = pluginConfig?.placeholder ? pluginConfig?.placeholder : config.placeholder;
+        config.instantValidate = pluginConfig?.instantValidate ? pluginConfig?.instantValidate : config.instantValidate;
+        config.invalidClassName = pluginConfig?.invalidClassName ? pluginConfig?.invalidClassName : config.invalidClassName;
+        config.isValidAttrName = pluginConfig?.isValidAttrName ? pluginConfig?.isValidAttrName : config.isValidAttrName;
+        if (pluginConfig?.classesToLeaveOnOriginal)
+          config.classesToLeaveOnOriginal = inputValidationConfig.classesToLeaveOnOriginal.concat(pluginConfig.classesToLeaveOnOriginal);
         if (pluginConfig?.attributesToCopy)
           config.attributesToCopy = inputValidationConfig.attributesToCopy.concat(pluginConfig.attributesToCopy);
+        
       }
       
       let invalidValueAttribute: string = "data-invalid-value";
@@ -51,8 +61,9 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
         );
 
         parent.element.classList.forEach((val) => { 
-          if(val !== 'flatpickr-input')
-            standinInputLocal.classList.add(val); 
+          if(config.classesToLeaveOnOriginal.indexOf(val) > -1)
+            return;
+          standinInputLocal.classList.add(val); 
         });
 
         standinInputLocal.classList.forEach((val) => {
@@ -99,7 +110,6 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       }
 
       function whenValid() {
-        
         parent._input.setAttribute(config.isValidAttrName, 'true');
         parent._input.removeAttribute(invalidValueAttribute);
         if (config.instantValidate)
@@ -164,6 +174,7 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       function valueChanged(parsedDate: Date[], dateString: string) {
         if (parent.loadedPlugins.indexOf("duration") === -1) {
           updateValue(dateString);
+          whenValid();
         } else {
           if(checkIfValid(dateString)){
             updateValue(dateString);
