@@ -24,6 +24,7 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
     const config = { ...inputValidationConfig, ...pluginConfig };
     
     let constructedRe: string;
+    let separator: string;
     let standinInput: HTMLInputElement;
 
     return (parent: Instance) => {
@@ -62,7 +63,8 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
 
         standinInput = standinInputLocal as HTMLInputElement;
 
-        parent.element.remove();
+        parent.element.setAttribute('style', 'width: 0; margin: 0; padding: 0; border: 0;')
+        //parent.element.remove();
       }
 
       function appendEventListeners() {
@@ -73,8 +75,14 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       function onBlur(e?: any) {
         if (!e || !e.target || !e.target.value)
           whenInvalid("");
-        if (checkIfValid(e.target.value))
-          whenValid(e.target.value);
+        if (checkIfValid(e.target.value)){
+          parent.input.value = e.target.value;
+          whenValid();
+          if (parent.loadedPlugins.indexOf("duration") !== -1)
+            durationOnValid(e.target.value);
+          else
+            parent.input.dispatchEvent(new Event('blur'));
+        }
         else 
           whenInvalid(e.target.value);
       }
@@ -84,9 +92,8 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
         parent.open(e, standinInput);
       }
 
-      function whenValid(value: string) {
-        parent.input.value = value;
-        parent.input.dispatchEvent(new Event('blur'))
+      function whenValid() {
+        
         parent._input.setAttribute(config.isValidAttrName, 'true');
         parent._input.removeAttribute(invalidValueAttribute);
         if (config.instantValidate)
@@ -100,53 +107,30 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           parent._input.classList.add(config.invalidClassName);
       }
 
-      // function durationOnValid(date: string) {
-      //   const inputs = [
-      //     parent.hourElement as HTMLInputElement,
-      //     parent.minuteElement as HTMLInputElement,
-      //     parent.secondElement as HTMLInputElement
-      //   ]
+      function durationOnValid(date: string) {
+        const inputs = [
+          parent.hourElement as HTMLInputElement,
+          parent.minuteElement as HTMLInputElement,
+          parent.secondElement as HTMLInputElement
+        ]
         
-      //   let arr = date.split(separator);
-      //   if (arr.length < 1)
-      //     return;
-      //   arr.forEach((val, i: number) => {
-      //     if (isNaN(parseInt(val)) || i > 2)
-      //       return;
-      //     if (inputs[i])
-      //       inputs[i].value = val;
-      //   });
-      //   if(parent.selectedDates.length !== 0)
-      //     parent.timeContainer?.dispatchEvent(new Event('increment'));
-      // }
+        let arr = date.split(separator);
+        if (arr.length < 1)
+          return;
+        arr.forEach((val, i: number) => {
+          if (isNaN(parseInt(val)) || i > 2)
+            return;
+          if (inputs[i])
+            inputs[i].value = val;
+        });
+        if(parent.selectedDates.length !== 0)
+          parent.timeContainer?.dispatchEvent(new Event('increment'));
+      }
 
       function checkIfValid(date: string) {
         let re = new RegExp(constructedRe);
         return re.test(date);
       }
-
-      // function overrideSetDate() {
-      //   let baseSetDate = parent.setDate;
-      //   console.log('set date fired')
-      //   parent.setDate = function setDate(date: string | number | Date | import("../../types/options").DateOption[],
-      //     triggerChange = false,
-      //     format = config.dateFormat) {
-      //       if (!date) {
-      //         baseSetDate(date, triggerChange, format);
-      //         return;
-      //       }
-      //       if(checkIfValid(date.toString())){
-      //         whenValid();
-      //         if (parent.loadedPlugins.indexOf("duration") === -1 || parent.selectedDates.length === 0)
-      //           baseSetDate(date, triggerChange, format);
-      //         else
-      //           durationOnValid(date.toString());
-      //       }
-      //       else {
-      //         whenInvalid(date.toString());
-      //       }
-      //   }
-      // }
 
       function constructRegEx() {
         constructedRe = parent.config.dateFormat
@@ -157,7 +141,7 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
             else if( tokenRegex[c as token] && arr[i - 1] !== "\\")
               return tokenRegex[c as token];
             else if (c !== "\\") {
-              //separator = c;
+              separator = c;
               return "\\" + c
             }
             else 
@@ -166,31 +150,33 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           .join("");
       }
 
-      function valueChanged(parsedDate: Date[], dateString: string) {
-        if (standinInput.value !== dateString)
-          standinInput.value = dateString;
-          console.log('dateStr', parsedDate);
-        // if(checkIfValid(dateString))
-        //   whenValid();
-        // if (parent.loadedPlugins.indexOf("duration") === -1) 
-        //   return;
-        //   console.log('dateStr', parsedDate);
-        //   let arr = dateString.split(separator);
-        // if (arr.length < 1)
-        //   return;
-        // let val = parent._input.getAttribute(invalidValueAttribute);
-        // if(val && 
-        //   arr[0] === parent.config.defaultHour.toString() &&
-        //   arr[1] === parent.config.defaultMinute.toString()) {
-        //   parent.input.value = val;
-        // } else {
-        //   whenValid();
-        // }
-          
+      function updateValue(newVal: string) {
+        if (standinInput.value !== newVal)
+          standinInput.value = newVal;
       }
 
-      function onOpened() {
-        console.log('opened')
+      function valueChanged(parsedDate: Date[], dateString: string) {
+        if (parent.loadedPlugins.indexOf("duration") === -1) {
+          updateValue(dateString);
+        } else {
+          if(checkIfValid(dateString)){
+            updateValue(dateString);
+            whenValid();
+          }
+          console.log('dateStr', parsedDate);
+          let arr = dateString.split(separator);
+          if (arr.length < 1)
+            return;
+          let val = parent._input.getAttribute(invalidValueAttribute);
+          if(val && 
+            arr[0] === parent.config.defaultHour.toString() &&
+            arr[1] === parent.config.defaultMinute.toString()) {
+            parent.input.value = val;
+          } else {
+            updateValue(dateString);
+            whenValid();
+          }
+        }
       }
       
       return {
@@ -200,7 +186,6 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
             parent.config.clickOpens = false;
           },
           onValueUpdate: valueChanged,
-          onOpen: onOpened,
           onReady: [
               adjustConfig,
               constructRegEx,
