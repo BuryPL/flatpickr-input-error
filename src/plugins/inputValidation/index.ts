@@ -22,7 +22,7 @@ const inputValidationConfig: InpuitValidationConfig = {
 
 function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin {
     const config = { ...inputValidationConfig, ...pluginConfig };
-    
+    let originalClassListFiltered = "";
     let constructedRe: string;
     let separator: string;
     let standinInput: HTMLInputElement;
@@ -46,11 +46,13 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       }
 
       function createAdditionalInput() {
-        let originalClassList = parent.element.classList.toString();
-                
+        //copy all classes but the flatpickr-input
+        originalClassListFiltered = parent.element.classList.toString().replace('flatpickr-input', '').trim();
+        //remove all classes but the flatpickr one for styling pourposes
+        parent.element.classList.remove(originalClassListFiltered);
         let standinInputLocal = parent._createElement<HTMLInputElement>(
           "input",
-          "flatpickr-input-validation-mock-input " + originalClassList
+          "flatpickr-input-validation-mock-input " + originalClassListFiltered
         );
 
         standinInputLocal.tabIndex = -1;
@@ -180,9 +182,10 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       }
       
       function onDestroy() {
-        if(standinInput) {
+        if(standinInput)
           standinInput.removeEventListener("click", localOnClick)
-        }
+        if(originalClassListFiltered)
+          parent.element.classList.add(originalClassListFiltered);
       }
 
       return {
