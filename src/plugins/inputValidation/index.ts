@@ -9,7 +9,9 @@ export interface InpuitValidationConfig {
   invalidClassName: string;
   isValidAttrName: string;
   classesToLeaveOnOriginal: string[];
+  dynamicClasses: string[];
   attributesToCopy: string[];
+  attributesToCut: string[];
 }
 
 const inputValidationConfig: InpuitValidationConfig = {
@@ -19,39 +21,85 @@ const inputValidationConfig: InpuitValidationConfig = {
   invalidClassName: "format-invalid",
   isValidAttrName: "data-is-valid",
   classesToLeaveOnOriginal: ['flatpickr-input'],
-  attributesToCopy: ['style', 'readonly', 'disabled']
+  dynamicClasses: [],
+  attributesToCopy: ['style', 'readonly', 'disabled'],
+  attributesToCut: []
 };
 
 function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin {
-    const config = inputValidationConfig;
+    const config = {...inputValidationConfig};
     let constructedRe: string;
     let separator: string;
-    let standinInput: HTMLInputElement;
 
     return (parent: Instance) => {
+      const self = {
+        standinInput: {} as HTMLInputElement,
+        invalidValueAttribute: "data-invalid-value",
+        originalAtributes: {} as NamedNodeMap,
+        observer: {} as MutationObserver
+      }
+      
       function adjustConfig() {
-        config.dateFormat = pluginConfig?.dateFormat ? pluginConfig?.dateFormat : config.dateFormat;
+        parent.config.dateFormat = config.dateFormat = pluginConfig?.dateFormat ? pluginConfig?.dateFormat : config.dateFormat;
         config.placeholder = pluginConfig?.placeholder ? pluginConfig?.placeholder : config.placeholder;
         config.instantValidate = pluginConfig?.instantValidate ? pluginConfig?.instantValidate : config.instantValidate;
         config.invalidClassName = pluginConfig?.invalidClassName ? pluginConfig?.invalidClassName : config.invalidClassName;
         config.isValidAttrName = pluginConfig?.isValidAttrName ? pluginConfig?.isValidAttrName : config.isValidAttrName;
+        config.dynamicClasses = pluginConfig?.dynamicClasses ? pluginConfig?.dynamicClasses : config.dynamicClasses;
+        config.attributesToCut = pluginConfig?.attributesToCut ? pluginConfig?.attributesToCut : config.attributesToCut;
         if (pluginConfig?.classesToLeaveOnOriginal)
           config.classesToLeaveOnOriginal = inputValidationConfig.classesToLeaveOnOriginal.concat(pluginConfig.classesToLeaveOnOriginal);
         if (pluginConfig?.attributesToCopy)
           config.attributesToCopy = inputValidationConfig.attributesToCopy.concat(pluginConfig.attributesToCopy);
-        
       }
-      
-      let invalidValueAttribute: string = "data-invalid-value";
-      parent.config.dateFormat = config.dateFormat;
 
+      function setClassObserver() {
+        if (!config.dynamicClasses || config.dynamicClasses.length === 0)
+            return;
+
+        let observerOptions = {
+          attributes: true,
+          attributeFilter: ['class'],
+          attributeOldValue: true,
+          childList: false,
+          characterData: false,
+          subtree: false
+        };
+
+        self.observer = new MutationObserver((mutationsList: MutationRecord[]) => {
+          const lastMut = mutationsList[mutationsList.length - 1];
+          const newElem = lastMut.target as Element;
+          self.observer.disconnect();
+          config.dynamicClasses.forEach((cl) => {
+            if(newElem.classList.contains(cl) && lastMut.oldValue?.indexOf(cl) === -1) { //a class was added
+              parent.element.classList.remove(cl);
+              self.standinInput.classList.add(cl);
+            } else if (self.standinInput.classList.contains(cl) && lastMut.oldValue?.indexOf(cl) === -1) { //a class was removed
+              self.standinInput.classList.remove(cl);
+            }
+            self.observer.observe(parent.element, observerOptions);
+          });
+        })
+        
+        self.observer.observe(parent.element, observerOptions)
+      }
 
       function assignAttributes(targetElement: Element) {
+        self.originalAtributes = {...parent.element.attributes} as NamedNodeMap;
         config.attributesToCopy.forEach((attr) => {
-        let originalReadonly= parent.element.attributes.getNamedItem(attr);
-        if (originalReadonly)
-          targetElement.setAttribute(attr, originalReadonly.value);
+        let originalAttr= parent.element.attributes.getNamedItem(attr);
+        if (originalAttr)
+          targetElement.setAttribute(attr, originalAttr.value);
         })
+
+        if (config.attributesToCut && config.attributesToCut.length > 0) {
+          config.attributesToCut.forEach((attr) => {
+            let originalAttr= parent.element.attributes.getNamedItem(attr);
+            if (originalAttr)
+              targetElement.setAttribute(attr, originalAttr.value);
+              parent.element.removeAttribute(attr);
+            })
+        }
       }
 
       function createAdditionalInput() {
@@ -70,23 +118,21 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           parent.element.classList.remove(val);
         });
 
-        standinInputLocal.tabIndex = -1;
-
         assignAttributes(standinInputLocal);
 
         standinInputLocal.setAttribute('placeholder', config.placeholder)
 
         parent.input.after(standinInputLocal);
 
-        standinInput = standinInputLocal as HTMLInputElement;
+        self.standinInput = standinInputLocal as HTMLInputElement;
 
-        parent.element.setAttribute('style', 'width: 0; margin: 0; padding: 0; border: 0;')
-        //parent.element.remove();
+        parent.element.setAttribute('style', 'width: 0; margin: 0; padding: 0; border: 0;');
+        parent.element.tabIndex = -1;
       }
 
       function appendEventListeners() {
-        parent._bind(standinInput, 'blur', onBlur)
-        standinInput.addEventListener("click", localOnClick)
+        parent._bind(self.standinInput, 'blur', onBlur)
+        self.standinInput.addEventListener("click", localOnClick)
       }
 
       function onBlur(e?: any) {
@@ -97,8 +143,12 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           whenValid();
           if (parent.loadedPlugins.indexOf("duration") !== -1)
             durationOnValid(e.target.value);
-          else
+          else {
+            if (parent.config.noCalendar && parent.config.enableTime)
+              setHours(e.target.value);
             parent.input.dispatchEvent(new Event('blur'));
+          }
+            
         }
         else 
           whenInvalid(e.target.value);
@@ -106,24 +156,30 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
 
       function localOnClick(e: any) {
         e?.stopPropagation();
-        parent.open(e, standinInput);
+        parent.open(e, self.standinInput);
       }
 
       function whenValid() {
         parent._input.setAttribute(config.isValidAttrName, 'true');
-        parent._input.removeAttribute(invalidValueAttribute);
+        parent._input.removeAttribute(self.invalidValueAttribute);
         if (config.instantValidate)
           parent._input.classList.remove(config.invalidClassName);
       }
 
       function whenInvalid(value: string) {
         parent._input.setAttribute(config.isValidAttrName, 'false');
-        parent._input.setAttribute(invalidValueAttribute, value);
+        parent._input.setAttribute(self.invalidValueAttribute, value);
         if (config.instantValidate)
           parent._input.classList.add(config.invalidClassName);
       }
 
       function durationOnValid(date: string) {
+        setHours(date);
+        if(parent.selectedDates.length !== 0)
+          parent.timeContainer?.dispatchEvent(new Event('increment'));
+      }
+      
+      function setHours(date: string) {
         const inputs = [
           parent.hourElement as HTMLInputElement,
           parent.minuteElement as HTMLInputElement,
@@ -139,8 +195,6 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           if (inputs[i])
             inputs[i].value = val;
         });
-        if(parent.selectedDates.length !== 0)
-          parent.timeContainer?.dispatchEvent(new Event('increment'));
       }
 
       function checkIfValid(date: string) {
@@ -172,13 +226,15 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       }
 
       function updateValue(newVal: string) {
-        if (standinInput.value !== newVal)
-          standinInput.value = newVal;
+        if (self.standinInput.value !== newVal)
+          self.standinInput.value = newVal;
+          //parent.formatDate(newVal)
       }
 
       function valueChanged(parsedDate: Date[], dateString: string) {
         if (parent.loadedPlugins.indexOf("duration") === -1) {
-          updateValue(dateString);
+          //updateValue(dateString);
+          self.standinInput.value = parent.formatDate(parsedDate[0], config.dateFormat);
           whenValid();
         } else {
           if(checkIfValid(dateString)){
@@ -190,7 +246,7 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
           let arr = dateString.split(separator);
           if (arr.length < 1)
             return;
-          let val = parent._input.getAttribute(invalidValueAttribute);
+          let val = parent._input.getAttribute(self.invalidValueAttribute);
           if(val && 
             arr[0] === parent.config.defaultHour.toString() &&
             arr[1] === parent.config.defaultMinute.toString()) {
@@ -203,13 +259,22 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
       }
       
       function onDestroy() {
-        if(standinInput) {
-          standinInput.removeEventListener("click", localOnClick);
-          standinInput.classList.forEach((val) => {
+        if(self.standinInput) {
+          self.standinInput.removeEventListener("click", localOnClick);
+          self.standinInput.classList.forEach((val) => {
             if(val !== 'flatpickr-input-validation-mock-input')
               parent.element.classList.add(val);
           });
         }
+        if (config.attributesToCut && config.attributesToCut.length > 0) {
+          config.attributesToCut.forEach((attr) => {
+            let originalAttr= self.originalAtributes.getNamedItem(attr);
+            if (originalAttr)
+              parent.element.setAttribute(attr, originalAttr.value);
+            })
+        }
+        if(self.observer)
+          self.observer.disconnect();
       }
 
       return {
@@ -225,6 +290,7 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
             createAdditionalInput,
             appendEventListeners,
             handleDefaultDate,
+            setClassObserver,
             () => {
                 parent.loadedPlugins.push("inputValidation");
             }
