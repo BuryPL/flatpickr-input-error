@@ -76,7 +76,7 @@ function inputValidation(pluginConfig?: Partial<InpuitValidationConfig>): Plugin
 
         standinInputLocal.setAttribute('placeholder', config.placeholder)
 
-        parent.input.parentNode?.appendChild(standinInputLocal);
+        parent.input.after(standinInputLocal);
 
         standinInput = standinInputLocal as HTMLInputElement;
 
